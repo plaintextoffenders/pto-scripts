@@ -48,7 +48,7 @@ def process_domain(domain, post_url):
 
 def email(emails, domain, post_url):
     recipient = emails
-    if not isinstance(emails, str):
+    if not isinstance(emails, basestring):
         recipient = ';'.join(emails)
     print 'Sending email to ' + recipient
     subject = 'Security Vulnerability In Your Site'
