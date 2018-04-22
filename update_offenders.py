@@ -9,6 +9,8 @@ from itertools import chain
 DOMAINS_FILENAME = '../plaintextoffenders/offenders.csv'
 # Tumblr keys filename. Assumes first line is consumer key and second line is consumer secret.
 KEYS_FILENAME = 'tumblr_keys'
+# Reformed offenders filename. Assumes csv file where each line contains: domain,post_url
+REFORMED_FILENAME = '../plaintextoffenders/reformed.csv'
 # Limit number of posts to fetch from Tumblr.
 LIMIT = 100
 # Scroll size of each request from Tumblr.
@@ -50,9 +52,14 @@ def write_domains(offenders, existing_domains):
             if domain not in existing_domains:
                 f.write('{},{}\n'.format(domain, post_url))
 
+def first_column_from_csv_file(filename):
+    """Returns first column from from csv file."""
+    return [l.strip().split(',')[0] for l in open(filename).readlines()]
+
 if __name__ == '__main__':
     keys = [l.strip() for l in open(KEYS_FILENAME).readlines()]
-    existing_domains = set([l.strip().split(',')[0] for l in open(DOMAINS_FILENAME).readlines()])
+    existing_domains = first_column_from_csv_file(DOMAINS_FILENAME)
+    existing_domains.extend(first_column_from_csv_file(REFORMED_FILENAME))
 
     tumblr_client = pytumblr.TumblrRestClient(consumer_key = keys[0], consumer_secret = keys[1])
 
