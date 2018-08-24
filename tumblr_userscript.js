@@ -2,7 +2,7 @@
 // @name         PTO Editing Toolkit
 // @locale       English
 // @namespace    http://plaintextoffenders.com/
-// @version      0.11
+// @version      0.13
 // @description  Various tools for PTO editors
 // @author       Aviem Zur
 // @match        https://www.tumblr.com/*
@@ -36,9 +36,13 @@ window.loadGitHubData = function(csvName, offender) {
                 if (csvName == 'reformed') {
                     reformedOffenders = xhr.responseText;
                 }
-                window.handleOffenderResult(offender);
+                if (offender != '') {
+                    window.handleOffenderResult(offender);
+                }
             } else {
-                window.checkIsPreviousOffender(offender);
+                if (offender != '') {
+                    window.checkIsPreviousOffender(offender);
+                }
             }
         }
     };
@@ -156,13 +160,60 @@ window.removeNode = function(node) {
     node.parentNode.removeChild(node);
 };
 
+window.addDomainsLine = function() {
+    var editor = window.getEditor();
+    var editorText = editor.innerHTML;
+    var domains = window.getDomainsFromString(editorText);
+    if (domains.length > 0) {
+        editor.innerHTML = '<p>' + domains.join(', ') + '</p>' + editor.innerHTML;
+        document.getElementById('ptoDomainInput').value = domains[0];
+        window.checkIsPreviousOffender(domains[0]);
+    }
+}
+
+window.badDomainPrefixes = ['www.', 'http://', 'https://']
+
+window.getDomainsFromString = function(str) {
+	var res = new Set();
+
+	var re1 = /(?=[^a-zA-Z0-9]([a-zA-Z0-9]+\.[a-zA-Z0-9]+))/g;
+	var re2 = /(?=[^a-zA-Z0-9]([a-zA-Z0-9]+\.[a-zA-Z0-9]+\.[a-zA-Z0-9]+))/g;
+	str.replace(re1, function(match, g1, g2) { res.add(g1); });
+	str.replace(re2, function(match, g1, g2) { res.add(g1); });
+
+	res = new Set([...res].filter(function(s) {
+		for (let prefix of window.badDomainPrefixes) {
+			if (s.startsWith(prefix)) {
+				return false;
+			}
+		}
+		return true;
+	}));
+
+	for (let result of res) {
+		for (let result2 of res) {
+			if (result != result2 && result.includes(result2)) {
+                console.log(result2);
+				res.delete(result2);
+			}
+		}
+	}
+
+    return [...res];
+}
+
+var offender = '';
+window.loadGitHubData('offenders', offender);
+window.loadGitHubData('reformed', offender);
+
 MutationObserver = window.MutationObserver || window.WebKitMutationObserver;
 
 var observer = new MutationObserver(function(mutations, observer) {
     if (!window.alreadyAddedSearch()) {
         window.addSearch();
-        window.clickFacebookBtn();
+        window.addDomainsLine();
         window.changeToAddToQueue();
+        //window.clickFacebookBtn();
     }
     window.fixTweetText();
 });
