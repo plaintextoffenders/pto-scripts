@@ -26,7 +26,8 @@ def get_offenders(limit, offset):
 def parse_post(post):
     try:
         post_url = post['post_url']
-        return map(lambda domain: (domain, post_url), get_domains(post))
+        post_timestamp = post['timestamp']
+        return map(lambda domain: (domain, post_url, post_timestamp), get_domains(post))
     except:
         print 'Failed to parse post:'
         if 'caption' in post:
@@ -49,8 +50,9 @@ def write_domains(offenders, existing_domains):
         for offender in offenders:
             domain = offender[0]
             post_url = offender[1]
+            post_timestamp = offender[2]
             if domain not in existing_domains:
-                f.write('{},{}\n'.format(domain, post_url))
+                f.write('{},{},{}\n'.format(domain, post_url, post_timestamp))
 
 def first_column_from_csv_file(filename):
     """Returns first column from from csv file."""
