@@ -2,7 +2,7 @@
 // @name         PTO Editing Toolkit
 // @locale       English
 // @namespace    http://plaintextoffenders.com/
-// @version      0.13
+// @version      0.14
 // @description  Various tools for PTO editors
 // @author       Aviem Zur
 // @match        https://www.tumblr.com/*
@@ -178,8 +178,8 @@ window.getDomainsFromString = function(str) {
 
 	var re1 = /(?=[^a-zA-Z0-9]([a-zA-Z0-9]+\.[a-zA-Z0-9]+))/g;
 	var re2 = /(?=[^a-zA-Z0-9]([a-zA-Z0-9]+\.[a-zA-Z0-9]+\.[a-zA-Z0-9]+))/g;
-	str.replace(re1, function(match, g1, g2) { res.add(g1); });
-	str.replace(re2, function(match, g1, g2) { res.add(g1); });
+	str.replace(re1, function(match, g1, g2) { res.add(g1.toLowerCase()); });
+	str.replace(re2, function(match, g1, g2) { res.add(g1.toLowerCase()); });
 
 	res = new Set([...res].filter(function(s) {
 		for (let prefix of window.badDomainPrefixes) {
