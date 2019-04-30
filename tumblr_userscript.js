@@ -2,7 +2,7 @@
 // @name         PTO Editing Toolkit
 // @locale       English
 // @namespace    http://plaintextoffenders.com/
-// @version      0.14
+// @version      0.15
 // @description  Various tools for PTO editors
 // @author       Aviem Zur
 // @match        https://www.tumblr.com/*
@@ -118,7 +118,7 @@ window.changeToAddToQueue = function() {
 window.fixTweetText = function() {
     var tweetTextArea = document.getElementsByClassName('tweet-textarea')[0];
     if (tweetTextArea != null) {
-        var expectedText = (/[^\n]*\n.*\n.*\n/.exec(window.getEditor().innerText)[0].replace('\n\n','\n') + "[URL]").replace(/[ \t]*\[URL\]/,"[URL]");
+        var expectedText = (/[^\n]*\n.*\n.*/.exec(window.getEditor().innerText)[0].replace('\n\n','\n') + "[URL]").replace(/[ \t]*\[URL\]/,"[URL]");
         tweetTextArea.innerHTML = expectedText;
         tweetTextArea.addEventListener("keyup", function() {
             if (window.isTwitterChecked()) {
