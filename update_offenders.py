@@ -19,11 +19,14 @@ SCROLL = 50
 DOMAINS_REGEX = re.compile('>([^<]*)<')
 DOMAINS_SPLIT_REGEX = re.compile(',\s*')
 
+
 def get_offenders(limit, offset):
-    posts = tumblr_client.posts('plaintextoffenders.com', limit = limit, offset = offset)['posts']
+    posts = tumblr_client.posts('plaintextoffenders.com', limit=limit, offset=offset)['posts']
     return set(chain.from_iterable(parse_post(post) for post in posts))
 
+
 def parse_post(post):
+    post_url = []
     try:
         post_url = post['post_url']
         return map(lambda domain: (domain, post_url), get_domains(post))
@@ -36,13 +39,16 @@ def parse_post(post):
         print post_url
         return []
 
+
 def get_domains(post):
     caption = post['caption']
     domains = DOMAINS_SPLIT_REGEX.split(DOMAINS_REGEX.search(caption).group(1))
     return map(encode_domain, domains)
 
+
 def encode_domain(str):
     return str.encode('utf-8').strip().replace('\xa0', '').replace('\xc2', '')
+
 
 def write_domains(offenders, existing_domains):
     with open(DOMAINS_FILENAME, 'a') as f:
@@ -52,16 +58,18 @@ def write_domains(offenders, existing_domains):
             if domain not in existing_domains:
                 f.write('{},{}\n'.format(domain, post_url))
 
+
 def first_column_from_csv_file(filename):
     """Returns first column from from csv file."""
     return [l.strip().split(',')[0] for l in open(filename).readlines()]
+
 
 if __name__ == '__main__':
     keys = [l.strip() for l in open(KEYS_FILENAME).readlines()]
     existing_domains = first_column_from_csv_file(DOMAINS_FILENAME)
     existing_domains.extend(first_column_from_csv_file(REFORMED_FILENAME))
 
-    tumblr_client = pytumblr.TumblrRestClient(consumer_key = keys[0], consumer_secret = keys[1])
+    tumblr_client = pytumblr.TumblrRestClient(consumer_key=keys[0], consumer_secret=keys[1])
 
     for i in range(0, LIMIT / SCROLL):
         offenders = get_offenders(SCROLL, i * SCROLL)
