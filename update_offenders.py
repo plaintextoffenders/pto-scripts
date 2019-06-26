@@ -1,17 +1,13 @@
-#!/usr/bin/python
-# Updates plaintextoffenders domains file based on new posts on the plaintextoffenders.com Tumblr.
 import pytumblr
 import re
-import io
-from itertools import chain
-from collections import OrderedDict
-from datetime import datetime as dt
+import unicodecsv as csv
+from datetime import datetime
 
-# Domains filename. Assumes csv file where each line contains: domain,post_url
+# Domains filename. Assumes csv file where each line contains: domain,post_url,post_date
 DOMAINS_FILENAME = '../plaintextoffenders/offenders.csv'
 # Tumblr keys filename. Assumes first line is consumer key and second line is consumer secret.
 KEYS_FILENAME = 'tumblr_keys'
-# Reformed offenders filename. Assumes csv file where each line contains: domain,post_url
+# Reformed offenders filename. Assumes csv file where each line contains: domain,post_url,post_date
 REFORMED_FILENAME = '../plaintextoffenders/reformed.csv'
 # Limit number of posts to fetch from Tumblr.
 LIMIT = 100
@@ -21,95 +17,100 @@ SCROLL = 50
 DOMAINS_REGEX = re.compile('>([^<]*)<')
 DOMAINS_SPLIT_REGEX = re.compile(',\s*')
 
-CSV_COLUMN_DOMAIN = 0
-CSV_COLUMN_POST_URL = 1
-CSV_COLUMN_DATE = 2
+keys = [l.strip() for l in open(KEYS_FILENAME).readlines()]
+tumblr_client = pytumblr.TumblrRestClient(consumer_key=keys[0], consumer_secret=keys[1])
+
 
 def get_offenders(limit, offset):
-    posts = tumblr_client.posts('plaintextoffenders.com', limit = limit, offset = offset)['posts']
-    return set(chain.from_iterable(parse_post(post) for post in posts))
+    posts = tumblr_client.posts('plaintextoffenders.com',
+                                limit=limit, offset=offset)
+    all_posts = []
+    for post in posts.get('posts', []):
+        # Parse post returns a list of dicts. Need to be appended into the all_posts list.
+        all_posts += parse_post(post)
+    return all_posts
+
 
 def parse_post(post):
+    """
+    :param post: Post from Tumblr
+    :return: list of dicts - (domain, post_url, post_date_)
+    """
+    # Parse post url and date
+    post_url = post.get('post_url')
+    post_date = post.get('date')
     try:
-        post_url = post['post_url']
-        post_date = post['date']
-        return map(lambda domain: (domain, post_url, post_date), get_domains(post))
-    except:
-        print 'Failed to parse post:'
+        # Make domains list per post
+        post_domains = [{"domain": domain, "post_url": post_url, "post_date": post_date}
+                        for domain in get_domains(post)]
+
+        return post_domains
+
+    except Exception as e:
+        print('Failed to parse post. Error: {}; Post:'.find(str(e)))
         if 'caption' in post:
-            print post['caption']
+            print(post['caption'])
         else:
-            print 'no caption'
-        print post_url
-        return []
+            print('no caption')
+        print(post_url)
+
 
 def get_domains(post):
     caption = post['caption']
     domains = DOMAINS_SPLIT_REGEX.split(DOMAINS_REGEX.search(caption).group(1))
-    return map(encode_domain, domains)
-
-def encode_domain(str):
-    return str.encode('utf-8').strip().replace('\xa0', '').replace('\xc2', '')
-
-def read_domains():
-     existing_domains = OrderedDict()
-     with io.open(DOMAINS_FILENAME, mode="r", encoding="utf-8-sig") as OFFENDER_FILE:
-        for row in OFFENDER_FILE.readlines():
-            rowSplit = row.strip().split(',')
-
-            domain = rowSplit[CSV_COLUMN_DOMAIN].encode("utf-8")
-            post_url = rowSplit[CSV_COLUMN_POST_URL].encode("utf-8")
-            post_date = rowSplit[CSV_COLUMN_DATE]
-
-            if domain not in existing_domains or dateLessThan(existing_domains[domain][1], post_date): # Handling duplicate entries
-                existing_domains[domain] = [post_url, post_date]
-
-     return existing_domains
-
-def append_domains(offenders, existing_domains, reformed_domains):
-    bChange = False
-    for offender in offenders:
-
-        domain = offender[CSV_COLUMN_DOMAIN]
-        post_url = offender[CSV_COLUMN_POST_URL]
-        post_date = offender[CSV_COLUMN_DATE]
-
-        if domain not in reformed_domains:
-            if domain not in existing_domains or dateLessThan(existing_domains[domain][1], post_date): 
-                bChange = True
-                existing_domains[domain] = [post_url,post_date]
-
-    return bChange
-
-def write_domains(existing_domains):
-    with io.open(DOMAINS_FILENAME, mode="w", encoding="utf-8-sig") as f:
-        for key in existing_domains:
-            post_url = existing_domains[key][0]
-            post_date = existing_domains[key][1]
-            f.write('{},{},{}\n'.format(key, post_url, post_date).decode("utf-8"))
-
-def first_column_from_csv_file(filename):
-    """Returns first column from from csv file."""
-    return [l.strip().split(',')[CSV_COLUMN_DOMAIN] for l in open(filename).readlines()]
+    return [dm.encode('utf-8').strip().replace('\xa0', '').replace('\xc2', '')
+            for dm in domains]
 
 
-def dateLessThan(date1,date2):
-   dt1 = dt.strptime(date1, '%Y-%m-%d %H:%M:%S %Z')
-   dt2 = dt.strptime(date2, '%Y-%m-%d %H:%M:%S %Z')
-   return dt1 < dt2
+def convert_csv(filename):
+    try:
+        with open(filename, 'r') as csv_f:
+            return list(csv.DictReader(csv_f, fieldnames=['domain', 'post_url', 'post_date']))
+    except IOError:
+        # File doesn't exist
+        return []
 
-if __name__ == '__main__':
-    keys = [l.strip() for l in open(KEYS_FILENAME).readlines()]
 
-    existing_domains = read_domains()
-    reformed_domains = first_column_from_csv_file(REFORMED_FILENAME)
+def date_less_then(date1, date2):
+    dt1 = datetime.strptime(date1, '%Y-%m-%d %H:%M:%S GMT')
+    dt2 = datetime.strptime(date2, '%Y-%m-%d %H:%M:%S GMT')
+    return dt1 < dt2
 
-    tumblr_client = pytumblr.TumblrRestClient(consumer_key = keys[0], consumer_secret = keys[1])
 
-    bChange = False
+def write_domains(offenders, existing_domains, mode='wb'):
+    """ Upsert domains in file, using Existing domains and offenders - the latest between them"""
+    new_domains = []
+
+    existing_domains_dict = {
+        dm.get('domain'): {
+            "post_url": dm.get('post_url'),
+            "post_date": dm.get('post_date') or '1900-01-01 00:00:00 GMT',
+            "domain": dm.get('domain')}
+        for dm in existing_domains
+    }
+
+    for o in offenders:
+        existing_domain = existing_domains_dict.get(o.get('domain'))
+        if not existing_domain:
+            new_domains.append(o)
+        elif date_less_then(existing_domain.get('post_date'), o.get('post_date')):
+            new_domains.append(o)
+        else:
+            new_domains.append(existing_domain)
+
+    with open(DOMAINS_FILENAME, mode=mode) as f:
+        writer_ = csv.DictWriter(f, fieldnames=['domain', 'post_url', 'post_date'])
+        writer_.writerows(new_domains)
+
+
+def run():
+    existing_domains = convert_csv(DOMAINS_FILENAME)
+    existing_domains += convert_csv(REFORMED_FILENAME)
+
     for i in range(0, LIMIT / SCROLL):
         offenders = get_offenders(SCROLL, i * SCROLL)
-        bChange = append_domains(offenders, existing_domains, reformed_domains) or bChange
-    if bChange:
-        write_domains(existing_domains)
-    
+        write_domains(offenders, existing_domains, mode='wb' if i == 0 else 'ab')
+
+
+if __name__ == '__main__':
+    run()
