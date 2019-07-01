@@ -92,13 +92,10 @@ def write_domains(offenders, existing_domains, mode='wb'):
     }
 
     for o in offenders:
-        existing_domain = existing_domains_dict.get(o.get('domain'))
-        if not existing_domain:
+        domain = o.get('domain')
+        if domain not in existing_domains_dict:
             new_domains.append(o)
-        elif date_less_then(existing_domain.get('post_date'), o.get('post_date')):
-            new_domains.append(o)
-        else:
-            new_domains.append(existing_domain)
+            existing_domains_dict[domain] = o
 
     with open(DOMAINS_FILENAME, mode=mode) as f:
         writer_ = csv.DictWriter(f, fieldnames=['domain', 'post_url', 'post_date'], lineterminator='\n')
@@ -109,10 +106,14 @@ def run():
     existing_domains = convert_csv(DOMAINS_FILENAME)
     existing_domains += convert_csv(REFORMED_FILENAME)
 
-    for i in range(0, LIMIT / SCROLL):
-        offenders = get_offenders(SCROLL, i * SCROLL)
-        write_domains(offenders, existing_domains, mode='wb' if i == 0 else 'ab')
+    offenders = []
 
+    for i in range(0, LIMIT / SCROLL):
+        offenders += get_offenders(SCROLL, i * SCROLL)
+
+    offenders.reverse()
+
+    write_domains(offenders, existing_domains, mode='ab')   
 
 if __name__ == '__main__':
     run()
