@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 import pytumblr
 import re
 import unicodecsv as csv
@@ -99,6 +101,7 @@ def write_domains(offenders, existing_domains, mode='wb'):
         writer_ = csv.DictWriter(f, fieldnames=['domain', 'post_url', 'post_date'])
         writer_.writeheader()
         writer_.writerows(sorted(all_domains.values(), key=lambda d: d.get('post_date' or datetime(1900,1,1))))
+
 
 
 def run():
