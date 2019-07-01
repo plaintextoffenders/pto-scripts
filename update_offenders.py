@@ -79,9 +79,8 @@ def date_less_then(date1, date2):
 
 def write_domains(offenders, existing_domains, mode='wb'):
     """ Upsert domains in file, using Existing domains and offenders - the latest between them"""
-    new_domains = []
 
-    existing_domains_dict = {
+    all_domains = {
         dm.get('domain'): {
             "post_url": dm.get('post_url'),
             "post_date": dm.get('post_date') or '1900-01-01 00:00:00 GMT',
@@ -90,26 +89,27 @@ def write_domains(offenders, existing_domains, mode='wb'):
     }
 
     for o in offenders:
-        existing_domain = existing_domains_dict.get(o.get('domain'))
+        existing_domain = all_domains.get(o.get('domain'))
         if not existing_domain:
-            new_domains.append(o)
+            all_domains[o.get('domain')] = o
         elif date_less_then(existing_domain.get('post_date'), o.get('post_date')):
-            new_domains.append(o)
-        else:
-            new_domains.append(existing_domain)
+            all_domains[o.get('domain')] = o
 
-    with open(DOMAINS_FILENAME, mode=mode) as f:
+    with open(DOMAINS_FILENAME, mode='wb') as f:
         writer_ = csv.DictWriter(f, fieldnames=['domain', 'post_url', 'post_date'])
-        writer_.writerows(new_domains)
+        writer_.writeheader()
+        writer_.writerows(sorted(all_domains.values(), key=lambda d: d.get('post_date' or datetime(1900,1,1))))
 
 
 def run():
     existing_domains = convert_csv(DOMAINS_FILENAME)
     existing_domains += convert_csv(REFORMED_FILENAME)
 
+    offenders = []
     for i in range(0, LIMIT / SCROLL):
-        offenders = get_offenders(SCROLL, i * SCROLL)
-        write_domains(offenders, existing_domains, mode='wb' if i == 0 else 'ab')
+        offenders += get_offenders(SCROLL, i * SCROLL)
+
+    write_domains(offenders, existing_domains)
 
 
 if __name__ == '__main__':
