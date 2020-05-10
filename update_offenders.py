@@ -1,9 +1,10 @@
-#!/usr/bin/python
+#!/usr/local/bin/python
 
 import pytumblr
 import re
-import unicodecsv as csv
+import csv
 from datetime import datetime
+import traceback
 
 # Domains filename. Assumes csv file where each line contains: domain,post_url,post_date
 DOMAINS_FILENAME = '../plaintextoffenders/offenders.csv'
@@ -29,7 +30,9 @@ def get_offenders(limit, offset):
     all_posts = []
     for post in posts.get('posts', []):
         # Parse post returns a list of dicts. Need to be appended into the all_posts list.
-        all_posts += parse_post(post)
+        parsed_post = parse_post(post)
+        if parsed_post:
+        	all_posts += parsed_post
     return all_posts
 
 
@@ -43,10 +46,13 @@ def parse_post(post):
     post_date = post.get('date')
     try:
         # Make domains list per post
+        print(post)
         post_domains = [{"domain": domain, "post_url": post_url, "post_date": post_date}
                         for domain in get_domains(post)]
-
+        
         return post_domains
+    except Exception as e:
+        traceback.print_exc()
 
     except Exception as e:
         print('Failed to parse post. Error: {}; Post:'.find(str(e)))
@@ -59,9 +65,7 @@ def parse_post(post):
 
 def get_domains(post):
     caption = post['caption']
-    domains = DOMAINS_SPLIT_REGEX.split(DOMAINS_REGEX.search(caption).group(1))
-    return [dm.encode('utf-8').strip().replace('\xa0', '').replace('\xc2', '')
-            for dm in domains]
+    return DOMAINS_SPLIT_REGEX.split(DOMAINS_REGEX.search(caption).group(1))
 
 
 def convert_csv(filename):
@@ -79,7 +83,7 @@ def date_less_then(date1, date2):
     return dt1 < dt2
 
 
-def write_domains(offenders, existing_domains, mode='wb'):
+def write_domains(offenders, existing_domains, mode='w'):
     """ Upsert domains in file, using Existing domains and offenders - the latest between them"""
     new_domains = []
 
@@ -98,8 +102,9 @@ def write_domains(offenders, existing_domains, mode='wb'):
             existing_domains_dict[domain] = o
 
     with open(DOMAINS_FILENAME, mode=mode) as f:
-        writer_ = csv.DictWriter(f, fieldnames=['domain', 'post_url', 'post_date'], lineterminator='\n')
-        writer_.writerows(new_domains)
+        writer = csv.DictWriter(f, fieldnames=['domain', 'post_url', 'post_date'], lineterminator='\n')
+        print(new_domains)
+        writer.writerows(new_domains)
 
 
 def run():
@@ -108,12 +113,12 @@ def run():
 
     offenders = []
 
-    for i in range(0, LIMIT / SCROLL):
+    for i in range(0, int(LIMIT / SCROLL)):
         offenders += get_offenders(SCROLL, i * SCROLL)
 
     offenders.reverse()
 
-    write_domains(offenders, existing_domains, mode='ab')   
+    write_domains(offenders, existing_domains, mode='a')   
 
 if __name__ == '__main__':
     run()
